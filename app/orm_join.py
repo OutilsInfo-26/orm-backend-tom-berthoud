@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import get_session
-from app.models import Author, Book, Publisher
-from app.schemas import BookWithAuthor, BookWithAuthorObject, BookWithPublisher
+from app.models import Author, Book, Person, Publisher
+from app.schemas import BookWithAuthor, BookWithAuthorAndPublisher, BookWithAuthorObject, BookWithPublisher, PersonOut, PersonWithBooks
 
 router = APIRouter(prefix="/orm", tags=["ORM jointure"])
 
@@ -81,6 +81,53 @@ def list_books_with_publisher(
             id=row.id,
             title=row.title,
             pages=row.pages,
+            publisher_name=row.publisher_name,
+        )
+        for row in rows
+    ]
+
+@router.get("/persons-with-books", response_model=list[PersonWithBooks])
+def list_persons_with_books(
+    session: Session = Depends(get_session),
+) -> list[PersonWithBooks]:
+    persons = session.scalars(
+        select(Person)
+        .options(selectinload(Person.books))
+    ).all()
+
+    return [
+        PersonWithBooks(
+            id=p.id,
+            first_name=p.first_name,
+            last_name=p.last_name,
+            book_name=[book.title for book in p.books],
+        )
+        for p in persons
+    ]
+
+@router.get("/books-full", response_model=list[BookWithAuthorAndPublisher])
+def list_books_full(
+    session: Session = Depends(get_session),
+) -> list[BookWithAuthorAndPublisher]:
+    stmt = (
+        select(
+            Book.id,
+            Book.title,
+            Book.pages,
+            Author.name.label("author_name"),
+            Publisher.name.label("publisher_name"),
+        )
+        .join(Author)
+        .join(Publisher, Book.publisher_id == Publisher.id, isouter=True)
+    )
+
+    rows = session.execute(stmt).all()
+    return [
+        BookWithAuthorAndPublisher(
+            id=row.id,
+            title=row.title,
+            pages=row.pages,
+            author_name=row.author_name,
             publisher_name=row.publisher_name,
         )
         for row in rows

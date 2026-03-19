@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.db import get_session
-from app.models import Author, Book
-from app.schemas import AuthorCreate, AuthorOut, AuthorUpdate, BookCreate, BookOut
+from app.models import Author, Book, Person, BookTag, Tag
+from app.schemas import AuthorCreate, AuthorOut, AuthorUpdate, BookCreate, BookOut, PersonCreate, PersonOut, PersonUpdate, StatsOut
 
 router = APIRouter(prefix="/orm", tags=["ORM simple"])
 
@@ -70,3 +70,74 @@ def create_book(
     session.commit()
     session.refresh(book)
     return book
+
+@router.get("/persons", response_model=list[PersonOut], status_code=201)
+def list_persons(session: Session = Depends(get_session)) -> list[PersonOut]:
+    stmt = select(Person).order_by(Person.id)
+    return session.scalars(stmt).all()
+
+@router.post("/persons", response_model=PersonOut, status_code=201)
+def create_person(
+    payload: PersonCreate,
+    session: Session = Depends(get_session),
+) -> PersonOut:
+    person = Person(first_name=payload.first_name, last_name=payload.last_name)
+    session.add(person)
+    session.commit()
+    session.refresh(person)
+    return person
+
+@router.patch("/persons/{person_id}", response_model=PersonOut)
+def update_person(
+    person_id: int,
+    payload: PersonUpdate,
+    session: Session = Depends(get_session),
+) -> PersonOut:
+
+    person = session.get(Person, person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(person, field, value)
+
+    session.commit()
+    session.refresh(person)
+    return person
+
+@router.delete("/books/{book_id}", status_code=204)
+def delete_book(
+    book_id: int,
+    session: Session = Depends(get_session),
+) -> None:
+    book = session.get(Book, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    booktag = session.scalars(select(BookTag).where(BookTag.book_id == book_id)).all()
+    
+    for bt in booktag:
+        session.delete(bt)
+    
+    session.delete(book)
+    session.commit()
+    return Response(status_code=204)
+
+@router.get("/stats", response_model=StatsOut)
+def get_stats(session: Session = Depends(get_session)) -> StatsOut:
+    
+    book_count = session.scalar(select(func.count(Book.id)))
+    author_count = session.scalar(select(func.count(Author.id)))
+    tag_count = session.scalar(select(func.count(Tag.id)))
+    page_count_max = session.scalar(select(func.max(Book.pages)))
+    titleofmaxpages = session.scalar(select(Book.title).where(Book.id == select(Book.id).where(Book.pages == page_count_max).limit(1)))
+    page_avg = session.scalar(select(func.avg(Book.pages)))
+
+    return StatsOut(
+        book_count=book_count,
+        author_count=author_count,
+        tag_count=tag_count,
+        titleofmaxpages=titleofmaxpages,
+        page_count_max=page_count_max,
+        page_avg=page_avg,
+    )

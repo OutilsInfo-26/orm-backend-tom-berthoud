@@ -24,7 +24,7 @@ def get_session():
 def init_db() -> None:
     from datetime import date
 
-    from app.models import Base, Author, Book, Tag, BookTag, Publisher
+    from app.models import Base, Author, Book, Tag, BookTag, Publisher,  Person
     from sqlalchemy import func, select
 
     Base.metadata.create_all(bind=engine) # Create tables if they don't exist
@@ -33,7 +33,7 @@ def init_db() -> None:
         author_count = session.scalar(select(func.count(Author.id)))
         if author_count:
             return
-
+        
         publishers = [
             Publisher(name="Gallimard"),          # 0
             Publisher(name="Addison-Wesley"),      # 1
@@ -58,19 +58,29 @@ def init_db() -> None:
         ]
         session.add_all(authors)
         session.flush()
+        
+        persons = [
+            Person(first_name="Alice", last_name="Smith"),
+            Person(first_name="Bob", last_name="Johnson"),
+            Person(first_name="Charlie", last_name="Brown"),
+            Person(first_name="David", last_name="Wilson"),
+            Person(first_name="Eve", last_name="Davis"),
+        ]
+        session.add_all(persons)
+        session.flush()
 
         books = [
             # Informatique
-            Book(title="Notes on the Analytical Engine", pages=120, author_id=authors[0].id, publisher_id=publishers[3].id),
-            Book(title="Compilers and Cobol", pages=220, author_id=authors[1].id, publisher_id=publishers[1].id),
-            Book(title="Computing Machinery and Intelligence", pages=90, author_id=authors[2].id, publisher_id=publishers[3].id),
-            Book(title="The Art of Computer Programming Vol. 1", pages=672, author_id=authors[3].id, publisher_id=publishers[1].id),
-            Book(title="The Art of Computer Programming Vol. 2", pages=784, author_id=authors[3].id, publisher_id=publishers[1].id),
-            Book(title="Just for Fun", pages=280, author_id=authors[4].id),
+            Book(title="Notes on the Analytical Engine", pages=120, author_id=authors[0].id, publisher_id=publishers[3].id, owner_id=persons[0].id),
+            Book(title="Compilers and Cobol", pages=220, author_id=authors[1].id, publisher_id=publishers[1].id, owner_id=persons[1].id),
+            Book(title="Computing Machinery and Intelligence", pages=90, author_id=authors[2].id, publisher_id=publishers[3].id, owner_id=persons[2].id),
+            Book(title="The Art of Computer Programming Vol. 1", pages=672, author_id=authors[3].id, publisher_id=publishers[1].id, owner_id=persons[0].id),
+            Book(title="The Art of Computer Programming Vol. 2", pages=784, author_id=authors[3].id, publisher_id=publishers[1].id, owner_id=persons[1].id),
+            Book(title="Just for Fun", pages=280, author_id=authors[4].id, owner_id=persons[2].id),
             # Proust — À la recherche du temps perdu
-            Book(title="Du côté de chez Swann", pages=531, author_id=authors[5].id, publisher_id=publishers[0].id),
-            Book(title="À l'ombre des jeunes filles en fleurs", pages=619, author_id=authors[5].id, publisher_id=publishers[0].id),
-            Book(title="Le Temps retrouvé", pages=524, author_id=authors[5].id, publisher_id=publishers[0].id),
+            Book(title="Du côté de chez Swann", pages=531, author_id=authors[5].id, publisher_id=publishers[0].id, owner_id=persons[3].id),
+            Book(title="À l'ombre des jeunes filles en fleurs", pages=619, author_id=authors[5].id, publisher_id=publishers[0].id, owner_id=persons[4].id),
+            Book(title="Le Temps retrouvé", pages=524, author_id=authors[5].id, publisher_id=publishers[0].id, owner_id=persons[0].id),
             # Tolkien
             Book(title="The Fellowship of the Ring", pages=423, author_id=authors[6].id, publisher_id=publishers[2].id),
             Book(title="The Two Towers", pages=352, author_id=authors[6].id, publisher_id=publishers[2].id),
@@ -131,5 +141,6 @@ def init_db() -> None:
             BookTag(book_id=books[13].id, tag_id=tags[9].id, tagged_at=date(2024, 8, 5)),
             BookTag(book_id=books[13].id, tag_id=tags[8].id, tagged_at=date(2024, 8, 5)),
         ]
+        
         session.add_all(book_tags)
         session.commit()
