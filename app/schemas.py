@@ -139,3 +139,11 @@ class StatsOut(BaseModel):
     titleofmaxpages: str
     page_count_max: int
     page_avg: float
+    
+class PersonWithBooksCount(PersonOut):
+    id: int
+    first_name: str
+    last_name: str
+    book_count: int | None
+
+    model_config = {"from_attributes": True}

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.models import Author, Book, Person, BookTag, Tag
-from app.schemas import AuthorCreate, AuthorOut, AuthorUpdate, BookCreate, BookOut, PersonCreate, PersonOut, PersonUpdate, StatsOut
+from app.schemas import AuthorCreate, AuthorOut, AuthorUpdate, BookCreate, BookOut, PersonCreate, PersonOut, PersonUpdate, PersonWithBooksCount, StatsOut
 
 router = APIRouter(prefix="/orm", tags=["ORM simple"])
 
@@ -141,3 +141,32 @@ def get_stats(session: Session = Depends(get_session)) -> StatsOut:
         page_count_max=page_count_max,
         page_avg=page_avg,
     )
+    
+@router.get("/persons-with-books-count", response_model=list[PersonWithBooksCount])
+def list_persons_with_books_count(
+    session: Session = Depends(get_session),
+) -> list[PersonWithBooksCount]:
+    stmt = (
+        select(
+            Person.id,
+            Person.first_name,
+            Person.last_name,
+            func.count(Book.id).label("book_count"),
+        )
+        .join(Person.books, isouter=True)
+        .group_by(
+            Person.id,
+            Person.first_name,
+            Person.last_name,
+        )
+        .order_by(Person.id)
+    )
+    rows = session.execute(stmt).all()
+    return [
+        PersonWithBooksCount(
+            id=row.id,
+            first_name=row.first_name,
+            last_name=row.last_name,
+            book_count=row.book_count,
+        )
+        for row in rows]
